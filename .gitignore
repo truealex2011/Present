@@ -1,0 +1,7 @@
+# Archive dump of the same files (too large for GitHub)
+drive-download-*.zip
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store

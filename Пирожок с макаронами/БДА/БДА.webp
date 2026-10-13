@@ -1,0 +1,767 @@
+         * If both `coverageExcludeGlobs` and `coverageIncludeGlobs` are provided,
+             * files must meet **both** criteria to be included in the coverage report.
+             * @since v22.10.0
+             * @default undefined
+             */
+            coverageIncludeGlobs?: string | readonly string[] | undefined;
+            /**
+             * Require a minimum percent of covered lines. If code
+             * coverage does not reach the threshold specified, the process will exit with code `1`.
+             * @since v22.10.0
+             * @default 0
+             */
+            lineCoverage?: number | undefined;
+            /**
+             * Require a minimum percent of covered branches. If code
+             * coverage does not reach the threshold specified, the process will exit with code `1`.
+             * @since v22.10.0
+             * @default 0
+             */
+            branchCoverage?: number | undefined;
+            /**
+             * Require a minimum percent of covered functions. If code
+             * coverage does not reach the threshold specified, the process will exit with code `1`.
+             * @since v22.10.0
+             * @default 0
+             */
+            functionCoverage?: number | undefined;
+            /**
+             * Specify environment variables to be passed along to the test process.
+             * This options is not compatible with `isolation='none'`. These variables will override
+             * those from the main process, and are not merged with `process.env`.
+             * @since v25.6.0
+             * @default process.env
+             */
+            env?: NodeJS.ProcessEnv | undefined;
+        }
+        interface TestsStreamEventMap extends ReadableEventMap {
+            "data": [data: TestEvent];
+            "test:coverage": [data: EventData.TestCoverage];
+            "test:complete": [data: EventData.TestComplete];
+            "test:dequeue": [data: EventData.TestDequeue];
+            "test:diagnostic": [data: EventData.TestDiagnostic];
+            "test:enqueue": [data: EventData.TestEnqueue];
+            "test:fail": [data: EventData.TestFail];
+            "test:interrupted": [data: EventData.TestInterrupted];
+            "test:pass": [data: EventData.TestPass];
+            "test:plan": [data: EventData.TestPlan];
+            "test:start": [data: EventData.TestStart];
+            "test:stderr": [data: EventData.TestStderr];
+            "test:stdout": [data: EventData.TestStdout];
+            "test:summary": [data: EventData.TestSummary];
+            "test:watch:drained": [];
+            "test:watch:restarted": [];
+        }
+        /**
+         * A successful call to `run()` will return a new `TestsStream` object, streaming a series of events representing the execution of the tests.
+         *
+         * Some of the events are guaranteed to be emitted in the same order as the tests are defined, while others are emitted in the order that the tests execute.
+         * @since v18.9.0, v16.19.0
+         */
+        interface TestsStream extends Readable {
+            // #region InternalEventEmitter
+            addListener<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            addListener(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            emit<E extends keyof TestsStreamEventMap>(eventName: E, ...args: TestsStreamEventMap[E]): boolean;
+            emit(eventName: string | symbol, ...args: any[]): boolean;
+            listenerCount<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener?: (...args: TestsStreamEventMap[E]) => void,
+            ): number;
+            listenerCount(eventName: string | symbol, listener?: (...args: any[]) => void): number;
+            listeners<E extends keyof TestsStreamEventMap>(eventName: E): ((...args: TestsStreamEventMap[E]) => void)[];
+            listeners(eventName: string | symbol): ((...args: any[]) => void)[];
+            off<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            off(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            on<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            on(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            once<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            once(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            prependListener<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            prependListener(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            prependOnceListener<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            prependOnceListener(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            rawListeners<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+            ): ((...args: TestsStreamEventMap[E]) => void)[];
+            rawListeners(eventName: string | symbol): ((...args: any[]) => void)[];
+            // eslint-disable-next-line @definitelytyped/no-unnecessary-generics
+            removeAllListeners<E extends keyof TestsStreamEventMap>(eventName?: E): this;
+            removeAllListeners(eventName?: string | symbol): this;
+            removeListener<E extends keyof TestsStreamEventMap>(
+                eventName: E,
+                listener: (...args: TestsStreamEventMap[E]) => void,
+            ): this;
+            removeListener(eventName: string | symbol, listener: (...args: any[]) => void): this;
+            // #endregion
+        }
+        namespace EventData {
+            interface Error extends globalThis.Error {
+                cause: unknown;
+            }
+            interface LocationInfo {
+                /**
+                 * The column number where the test is defined, or
+                 * `undefined` if the test was run through the REPL.
+                 */
+                column?: number;
+                /**
+                 * The path of the test file, `undefined` if test was run through the REPL.
+                 */
+                file?: string;
+                /**
+                 * The line number where the test is defined, or `undefined` if the test was run through the REPL.
+                 */
+                line?: number;
+            }
+            interface TestDiagnostic extends LocationInfo {
+                /**
+                 * The diagnostic message.
+                 */
+                message: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The severity level of the diagnostic message.
+                 * Possible values are:
+                 * * `'info'`: Informational messages.
+                 * * `'warn'`: Warnings.
+                 * * `'error'`: Errors.
+                 */
+                level: "info" | "warn" | "error";
+            }
+            interface TestCoverage {
+                /**
+                 * An object containing the coverage report.
+                 */
+                summary: {
+                    /**
+                     * An array of coverage reports for individual files.
+                     */
+                    files: Array<{
+                        /**
+                         * The absolute path of the file.
+                         */
+                        path: string;
+                        /**
+                         * The total number of lines.
+                         */
+                        totalLineCount: number;
+                        /**
+                         * The total number of branches.
+                         */
+                        totalBranchCount: number;
+                        /**
+                         * The total number of functions.
+                         */
+                        totalFunctionCount: number;
+                        /**
+                         * The number of covered lines.
+                         */
+                        coveredLineCount: number;
+                        /**
+                         * The number of covered branches.
+                         */
+                        coveredBranchCount: number;
+                        /**
+                         * The number of covered functions.
+                         */
+                        coveredFunctionCount: number;
+                        /**
+                         * The percentage of lines covered.
+                         */
+                        coveredLinePercent: number;
+                        /**
+                         * The percentage of branches covered.
+                         */
+                        coveredBranchPercent: number;
+                        /**
+                         * The percentage of functions covered.
+                         */
+                        coveredFunctionPercent: number;
+                        /**
+                         * An array of functions representing function coverage.
+                         */
+                        functions: Array<{
+                            /**
+                             * The name of the function.
+                             */
+                            name: string;
+                            /**
+                             * The line number where the function is defined.
+                             */
+                            line: number;
+                            /**
+                             * The number of times the function was called.
+                             */
+                            count: number;
+                        }>;
+                        /**
+                         * An array of branches representing branch coverage.
+                         */
+                        branches: Array<{
+                            /**
+                             * The line number where the branch is defined.
+                             */
+                            line: number;
+                            /**
+                             * The number of times the branch was taken.
+                             */
+                            count: number;
+                        }>;
+                        /**
+                         * An array of lines representing line numbers and the number of times they were covered.
+                         */
+                        lines: Array<{
+                            /**
+                             * The line number.
+                             */
+                            line: number;
+                            /**
+                             * The number of times the line was covered.
+                             */
+                            count: number;
+                        }>;
+                    }>;
+                    /**
+                     * An object containing whether or not the coverage for
+                     * each coverage type.
+                     * @since v22.9.0
+                     */
+                    thresholds: {
+                        /**
+                         * The function coverage threshold.
+                         */
+                        function: number;
+                        /**
+                         * The branch coverage threshold.
+                         */
+                        branch: number;
+                        /**
+                         * The line coverage threshold.
+                         */
+                        line: number;
+                    };
+                    /**
+                     * An object containing a summary of coverage for all files.
+                     */
+                    totals: {
+                        /**
+                         * The total number of lines.
+                         */
+                        totalLineCount: number;
+                        /**
+                         * The total number of branches.
+                         */
+                        totalBranchCount: number;
+                        /**
+                         * The total number of functions.
+                         */
+                        totalFunctionCount: number;
+                        /**
+                         * The number of covered lines.
+                         */
+                        coveredLineCount: number;
+                        /**
+                         * The number of covered branches.
+                         */
+                        coveredBranchCount: number;
+                        /**
+                         * The number of covered functions.
+                         */
+                        coveredFunctionCount: number;
+                        /**
+                         * The percentage of lines covered.
+                         */
+                        coveredLinePercent: number;
+                        /**
+                         * The percentage of branches covered.
+                         */
+                        coveredBranchPercent: number;
+                        /**
+                         * The percentage of functions covered.
+                         */
+                        coveredFunctionPercent: number;
+                    };
+                    /**
+                     * The working directory when code coverage began. This
+                     * is useful for displaying relative path names in case
+                     * the tests changed the working directory of the Node.js process.
+                     */
+                    workingDirectory: string;
+                };
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+            }
+            interface TestComplete extends LocationInfo {
+                /**
+                 * Additional execution metadata.
+                 */
+                details: {
+                    /**
+                     * Whether the test passed or not.
+                     */
+                    passed: boolean;
+                    /**
+                     * The duration of the test in milliseconds.
+                     */
+                    duration_ms: number;
+                    /**
+                     * An error wrapping the error thrown by the test if it did not pass.
+                     */
+                    error?: Error;
+                    /**
+                     * The type of the test, used to denote whether this is a suite.
+                     */
+                    type?: "suite" | "test";
+                };
+                /**
+                 * The test name.
+                 */
+                name: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The ordinal number of the test.
+                 */
+                testNumber: number;
+                /**
+                 * Present if `context.todo` is called.
+                 */
+                todo?: string | boolean;
+                /**
+                 * Present if `context.skip` is called.
+                 */
+                skip?: string | boolean;
+            }
+            interface TestDequeue extends LocationInfo {
+                /**
+                 * The test name.
+                 */
+                name: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The test type. Either `'suite'` or `'test'`.
+                 * @since v22.15.0
+                 */
+                type: "suite" | "test";
+            }
+            interface TestEnqueue extends LocationInfo {
+                /**
+                 * The test name.
+                 */
+                name: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The test type. Either `'suite'` or `'test'`.
+                 * @since v22.15.0
+                 */
+                type: "suite" | "test";
+            }
+            interface TestFail extends LocationInfo {
+                /**
+                 * Additional execution metadata.
+                 */
+                details: {
+                    /**
+                     * The duration of the test in milliseconds.
+                     */
+                    duration_ms: number;
+                    /**
+                     * An error wrapping the error thrown by the test.
+                     */
+                    error: Error;
+                    /**
+                     * The type of the test, used to denote whether this is a suite.
+                     * @since v20.0.0, v19.9.0, v18.17.0
+                     */
+                    type?: "suite" | "test";
+                    /**
+                     * The attempt number of the test run,
+                     * present only when using the `--test-rerun-failures` flag.
+                     * @since v24.7.0
+                     */
+                    attempt?: number;
+                };
+                /**
+                 * The test name.
+                 */
+                name: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The ordinal number of the test.
+                 */
+                testNumber: number;
+                /**
+                 * Present if `context.todo` is called.
+                 */
+                todo?: string | boolean;
+                /**
+                 * Present if `context.skip` is called.
+                 */
+                skip?: string | boolean;
+            }
+            interface TestInterrupted {
+                /**
+                 * An array of objects containing information about the
+                 * interrupted tests.
+                 */
+                tests: TestStart[];
+            }
+            interface TestPass extends LocationInfo {
+                /**
+                 * Additional execution metadata.
+                 */
+                details: {
+                    /**
+                     * The duration of the test in milliseconds.
+                     */
+                    duration_ms: number;
+                    /**
+                     * The type of the test, used to denote whether this is a suite.
+                     * @since 20.0.0, 19.9.0, 18.17.0
+                     */
+                    type?: "suite" | "test";
+                    /**
+                     * The attempt number of the test run,
+                     * present only when using the `--test-rerun-failures` flag.
+                     * @since v24.7.0
+                     */
+                    attempt?: number;
+                    /**
+                     * The attempt number the test passed on,
+                     * present only when using the `--test-rerun-failures` flag.
+                     * @since v24.7.0
+                     */
+                    passed_on_attempt?: number;
+                };
+                /**
+                 * The test name.
+                 */
+                name: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The ordinal number of the test.
+                 */
+                testNumber: number;
+                /**
+                 * Present if `context.todo` is called.
+                 */
+                todo?: string | boolean;
+                /**
+                 * Present if `context.skip` is called.
+                 */
+                skip?: string | boolean;
+            }
+            interface TestPlan extends LocationInfo {
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+                /**
+                 * The number of subtests that have ran.
+                 */
+                count: number;
+            }
+            interface TestStart extends LocationInfo {
+                /**
+                 * The test name.
+                 */
+                name: string;
+                /**
+                 * The nesting level of the test.
+                 */
+                nesting: number;
+            }
+            interface TestStderr {
+                /**
+                 * The path of the test file.
+                 */
+                file: string;
+                /**
+                 * The message written to `stderr`.
+                 */
+                message: string;
+            }
+            interface TestStdout {
+                /**
+                 * The path of the test file.
+                 */
+                file: string;
+                /**
+                 * The message written to `stdout`.
+                 */
+                message: string;
+            }
+            interface TestSummary {
+                /**
+                 * An object containing the counts of various test results.
+                 */
+                counts: {
+                    /**
+                     * The total number of cancelled tests.
+                     */
+                    cancelled: number;
+                    /**
+                     * The total number of passed tests.
+                     */
+                    passed: number;
+                    /**
+                     * The total number of skipped tests.
+                     */
+                    skipped: number;
+                    /**
+                     * The total number of suites run.
+                     */
+                    suites: number;
+                    /**
+                     * The total number of tests run, excluding suites.
+                     */
+                    tests: number;
+                    /**
+                     * The total number of TODO tests.
+                     */
+                    todo: number;
+                    /**
+                     * The total number of top level tests and suites.
+                     */
+                    topLevel: number;
+                };
+                /**
+                 * The duration of the test run in milliseconds.
+                 */
+                duration_ms: number;
+                /**
+                 * The path of the test file that generated the
+                 * summary. If the summary corresponds to multiple files, this value is
+                 * `undefined`.
+                 */
+                file: string | undefined;
+                /**
+                 * Indicates whether or not the test run is considered
+                 * successful or not. If any error condition occurs, such as a failing test or
+                 * unmet coverage threshold, this value will be set to `false`.
+                 */
+                success: boolean;
+            }
+        }
+        /**
+         * An instance of `TestContext` is passed to each test function in order to
+         * interact with the test runner. However, the `TestContext` constructor is not
+         * exposed as part of the API.
+         * @since v18.0.0, v16.17.0
+         */
+        interface TestContext {
+            /**
+             * An object containing assertion methods bound to the test context.
+             * The top-level functions from the `node:assert` module are exposed here for the purpose of creating test plans.
+             *
+             * **Note:** Some of the functions from `node:assert` contain type assertions. If these are called via the
+             * TestContext `assert` object, then the context parameter in the test's function signature **must be explicitly typed**
+             * (ie. the parameter must have a type annotation), otherwise an error will be raised by the TypeScript compiler:
+             * ```ts
+             * import { test, type TestContext } from 'node:test';
+             *
+             * // The test function's context parameter must have a type annotation.
+             * test('example', (t: TestContext) => {
+             *   t.assert.deepStrictEqual(actual, expected);
+             * });
+             *
+             * // Omitting the type annotation will result in a compilation error.
+             * test('example', t => {
+             *   t.assert.deepStrictEqual(actual, expected); // Error: 't' needs an explicit type annotation.
+             * });
+             * ```
+             * @since v22.2.0, v20.15.0
+             */
+            readonly assert: TestContextAssert;
+            /**
+             * This function is used to create a hook running before subtest of the current test.
+             * @param fn The hook function. The first argument to this function is a `TestContext` object.
+             * If the hook uses callbacks, the callback function is passed as the second argument.
+             * @param options Configuration options for the hook.
+             * @since v20.1.0, v18.17.0
+             */
+            before(fn?: TestContextHookFn, options?: HookOptions): void;
+            /**
+             * This function is used to create a hook running before each subtest of the current test.
+             * @param fn The hook function. The first argument to this function is a `TestContext` object.
+             * If the hook uses callbacks, the callback function is passed as the second argument.
+             * @param options Configuration options for the hook.
+             * @since v18.8.0
+             */
+            beforeEach(fn?: TestContextHookFn, options?: HookOptions): void;
+            /**
+             * This function is used to create a hook that runs after the current test finishes.
+             * @param fn The hook function. The first argument to this function is a `TestContext` object.
+             * If the hook uses callbacks, the callback function is passed as the second argument.
+             * @param options Configuration options for the hook.
+             * @since v18.13.0
+             */
+            after(fn?: TestContextHookFn, options?: HookOptions): void;
+            /**
+             * This function is used to create a hook running after each subtest of the current test.
+             * @param fn The hook function. The first argument to this function is a `TestContext` object.
+             * If the hook uses callbacks, the callback function is passed as the second argument.
+             * @param options Configuration options for the hook.
+             * @since v18.8.0
+             */
+            afterEach(fn?: TestContextHookFn, options?: HookOptions): void;
+            /**
+             * This function is used to write diagnostics to the output. Any diagnostic
+             * information is included at the end of the test's results. This function does
+             * not return a value.
+             *
+             * ```js
+             * test('top level test', (t) => {
+             *   t.diagnostic('A diagnostic message');
+             * });
+             * ```
+             * @since v18.0.0, v16.17.0
+             * @param message Message to be reported.
+             */
+            diagnostic(message: string): void;
+            /**
+             * The absolute path of the test file that created the current test. If a test file imports
+             * additional modules that generate tests, the imported tests will return the path of the root test file.
+             * @since v22.6.0
+             */
+            readonly filePath: string | undefined;
+            /**
+             * The name of the test and each of its ancestors, separated by `>`.
+             * @since v22.3.0
+             */
+            readonly fullName: string;
+            /**
+             * The name of the test.
+             * @since v18.8.0, v16.18.0
+             */
+            readonly name: string;
+            /**
+             * Indicated whether the test succeeded.
+             * @since v21.7.0, v20.12.0
+             */
+            readonly passed: boolean;
+            /**
+             * The failure reason for the test/case; wrapped and available via `context.error.cause`.
+             * @since v21.7.0, v20.12.0
+             */
+            readonly error: EventData.Error | null;
+            /**
+             * Number of times the test has been attempted.
+             * @since v21.7.0, v20.12.0
+             */
+            readonly attempt: number;
+            /**
+             * The unique identifier of the worker running the current test file. This value is
+             * derived from the `NODE_TEST_WORKER_ID` environment variable. When running tests
+             * with `--test-isolation=process` (the default), each test file runs in a separate
+             * child process and is assigned a worker ID from 1 to N, where N is the number of
+             * concurrent workers. When running with `--test-isolation=none`, all tests run in
+             * the same process and the worker ID is always 1. This value is `undefined` when
+             * not running in a test context.
+             *
+             * This property is useful for splitting resources (like database connections or
+             * server ports) across concurrent test files:
+             *
+             * ```js
+             * import { test } from 'node:test';
+             * import { process } from 'node:process';
+             *
+             * test('database operations', async (t) => {
+             *   // Worker ID is available via context
+             *   console.log(`Running in worker ${t.workerId}`);
+             *
+             *   // Or via environment variable (available at import time)
+             *   const workerId = process.env.NODE_TEST_WORKER_ID;
+             *   // Use workerId to allocate separate resources per worker
+             * });
+             * ```
+             * @since v25.8.0
+             */
+            readonly workerId: number | undefined;
+            /**
+             * This function is used to set the number of assertions and subtests that are expected to run
+             * within the test. If the number of assertions and subtests that run does not match the
+             * expected count, the test will fail.
+             *
+             * > Note: To make sure assertions are tracked, `t.assert` must be used instead of `assert` directly.
+             *
+             * ```js
+             * test('top level test', (t) => {
+             *   t.plan(2);
+             *   t.assert.ok('some relevant assertion here');
+             *   t.test('subtest', () => {});
+             * });
+             * ```
+             *
+             * When working with asynchronous code, the `plan` function can be used to ensure that the
+             * correct number of assertions are run:
+             *
+             * ```js
+             * test('planning with streams', (t, done) => {
+             *   function* generate() {
+             *     yield 'a';
+             *     yield 'b';
+             *     yield 'c';
+             *   }
+             *   const expected = ['a', 'b', 'c'];
+             *   t.plan(expected.length);
+             *   const stream = Readable.from(generate());
+             *   stream.on('data', (chunk) => {
+             *     t.assert.strictEqual(chunk, expected.shift());
+             *   });
+             *
+             *   stream.on('end', () => {
+             *     done();
+             *   });
+             * });
+             * ```
+             *
+             * When using the `wait` option, you can control how long the test will wait for the expected assertions.
+             * For example, setting a maximum wait time ensures that the test will wait for asynchronous assertions
+             * to complete within the specified timeframe:
+             *
+             * ```js
+             * test('plan with wait: 2000 waits for async assertions', (t) => {
+             *   t.plan(1, { wait: 2000 }); // Waits for up to 2 seconds for the assertion to complete.
+             *
+             *   const asyncActivity = () => {
+             *     setTimeout(() => {
+             *          *       t.assert.ok(true, 'Async assertion com                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
